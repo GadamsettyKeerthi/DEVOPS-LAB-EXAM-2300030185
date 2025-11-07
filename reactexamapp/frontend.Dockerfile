@@ -1,23 +1,24 @@
-# ---- Stage 1: Build ----
-FROM node:20-alpine AS build
+# Stage 1: Build the app
+FROM eclipse-temurin:21-jdk AS builder
+
 WORKDIR /app
 
-COPY package*.json ./
+COPY mvnw .          
+COPY .mvn/ .mvn
 
-RUN npm install
+RUN chmod +x mvnw
 
-# Ensure vite binary is executable
-RUN chmod +x node_modules/.bin/vite
+COPY pom.xml ./
+COPY src ./src
 
-COPY . .
-RUN npm run build
+RUN ./mvnw clean package -DskipTests
 
-# ---- Stage 2: Serve ----
-FROM nginx:alpine
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-# Copy built files
-COPY --from=build /app/dist /usr/share/nginx/html
+# Stage 2: Run the app
+FROM eclipse-temurin:21-jdk
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+
+EXPOSE 2000
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
